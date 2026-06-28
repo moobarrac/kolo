@@ -1,0 +1,23 @@
+{
+  "name": "kolo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kólò — personal financial operating system (provable double-entry ledger)",
+  "workspaces": [
+    "shared",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:start": "npm run db:start --workspace backend",
+    "db:reset": "npm run db:reset --workspace backend"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

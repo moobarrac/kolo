@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+*.tsbuildinfo
+
+# env — NEVER commit. Service-role key lives only in the backend/jobs runtime env.
+.env
+.env.*
+!.env.example
+
+# supabase local
+backend/supabase/.temp/
+backend/supabase/.branches/
+**/.supabase/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# test / coverage
+coverage/
+
+# local backups dumped by the daily job
+backups/
