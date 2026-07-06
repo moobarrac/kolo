@@ -1,39 +1,65 @@
-import { money } from "@kolo/shared";
-import { Money } from "@/components/Money";
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppLayout } from "@/components/AppLayout";
 
-// Placeholder shell. Phase 1 builds the real Overview (net-worth hero + bridge).
-// This screen exists to prove the toolchain + shared package wire up correctly.
+// Pages are code-split: each route loads its own chunk on navigation, so the
+// initial load stays small. Named exports are adapted to lazy()'s default shape.
+const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
+const OverviewPage = lazy(() => import("@/pages/OverviewPage").then((m) => ({ default: m.OverviewPage })));
+const MoneyPage = lazy(() => import("@/pages/MoneyPage").then((m) => ({ default: m.MoneyPage })));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const RecurringPage = lazy(() => import("@/pages/RecurringPage").then((m) => ({ default: m.RecurringPage })));
+const ThingsIOwnPage = lazy(() => import("@/pages/ThingsIOwnPage").then((m) => ({ default: m.ThingsIOwnPage })));
+const WhatIOwePage = lazy(() => import("@/pages/WhatIOwePage").then((m) => ({ default: m.WhatIOwePage })));
+const OwedToMePage = lazy(() => import("@/pages/OwedToMePage").then((m) => ({ default: m.OwedToMePage })));
+const GoalsPage = lazy(() => import("@/pages/GoalsPage").then((m) => ({ default: m.GoalsPage })));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage })));
+const BudgetsPage = lazy(() => import("@/pages/BudgetsPage").then((m) => ({ default: m.BudgetsPage })));
+const ImportPage = lazy(() => import("@/pages/ImportPage").then((m) => ({ default: m.ImportPage })));
+const ReconcilePage = lazy(() => import("@/pages/ReconcilePage").then((m) => ({ default: m.ReconcilePage })));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
+
+const Loading = () => (
+  <div className="mx-auto max-w-4xl px-5 pt-8">
+    <div className="h-8 w-40 animate-pulse rounded-md bg-ink/10" />
+    <div className="mt-6 h-40 w-full animate-pulse rounded-2xl bg-ink/5" />
+    <div className="mt-6 h-40 w-full animate-pulse rounded-2xl bg-ink/5" />
+  </div>
+);
+
+// Routing. /login is public; everything else lives behind ProtectedRoute inside
+// the app shell (AppLayout provides the sidebar + bottom nav). Routes mirror
+// NAV_ITEMS in app/nav.ts.
 export default function App() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <header className="mb-10">
-        <h1 className="font-display text-4xl font-bold text-forest">Kólò</h1>
-        <p className="mt-1 text-ink/60">Your personal financial operating system.</p>
-      </header>
-
-      <section className="rounded-2xl bg-surface p-8 shadow-sm ring-1 ring-ink/5">
-        <p className="text-sm uppercase tracking-wide text-ink/50">Net worth</p>
-        <div className="mt-2 text-5xl">
-          <Money value={money(960000000n, "NGN")} tone="balance" />
-        </div>
-        <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-ink/50">Inflow</p>
-            <Money value={money(120000000n, "NGN")} tone="gain" />
-          </div>
-          <div>
-            <p className="text-ink/50">Outflow</p>
-            <Money value={money(-80000000n, "NGN")} tone="loss" />
-          </div>
-          <div>
-            <p className="text-ink/50">USD held</p>
-            <Money value={money(500000n, "USD")} tone="balance" />
-          </div>
-        </div>
-        <p className="mt-8 text-xs text-ink/40">
-          Scaffold only — see <code>docs/tech-doc.md</code> §15 for the build phases.
-        </p>
-      </section>
-    </main>
+    <BrowserRouter>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<OverviewPage />} />
+            <Route path="money" element={<MoneyPage />} />
+            <Route path="things-i-own" element={<ThingsIOwnPage />} />
+            <Route path="what-i-owe" element={<WhatIOwePage />} />
+            <Route path="owed-to-me" element={<OwedToMePage />} />
+            <Route path="recurring" element={<RecurringPage />} />
+            <Route path="goals" element={<GoalsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="budgets" element={<BudgetsPage />} />
+            <Route path="import" element={<ImportPage />} />
+            <Route path="reconcile" element={<ReconcilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 }
