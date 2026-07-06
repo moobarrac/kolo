@@ -2,12 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens as RGB channels so Tailwind's `/opacity` modifiers keep working
+   (§13.2). Light is the "private ledger" default; `.dark` on <html> swaps the
+   canvas/surface/ink and brightens the accents for legibility on a dark ground.
+   `paper` stays light in both themes — it is the text color that sits on accent
+   buttons (bg-forest / bg-loss), not the page background. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --color-ink: 22 39 30;
+  --color-canvas: 243 244 240;
+  --color-paper: 243 244 240;
+  --color-surface: 255 255 255;
+  --color-forest: 32 80 59;
+  --color-brass: 176 125 43;
+  --color-gain: 32 80 59;
+  --color-loss: 162 60 43;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-ink: 232 235 228;
+  --color-canvas: 15 21 18;
+  --color-surface: 27 36 30;
+  --color-forest: 68 142 105;
+  --color-brass: 201 154 78;
+  --color-gain: 74 175 120;
+  --color-loss: 214 99 79;
 }
 
 body {
-  @apply bg-paper text-ink font-body antialiased;
+  @apply bg-canvas text-ink font-body antialiased;
+}
+
+/* Native <select> option lists render with UA-default colors on some mobile
+   browsers, so in dark mode the text can end up unreadable. Force the themed
+   colors; iOS's native picker follows `color-scheme` (set above) instead. */
+option {
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-ink));
 }
 
 /* tabular figures everywhere money is shown */
