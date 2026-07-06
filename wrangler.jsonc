@@ -1,0 +1,11 @@
+{
+  // Deploys the built SPA as Cloudflare Workers Static Assets. There is no
+  // `main` worker script, so no Functions run — every request is a free static
+  // asset request. `single-page-application` serves index.html for client routes.
+  "name": "kolo",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./frontend/dist",
+    "not_found_handling": "single-page-application"
+  }
+}
