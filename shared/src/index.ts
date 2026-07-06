@@ -3,7 +3,10 @@
 // frontend/ and backend/; neither redefines these. [INVARIANT §2.5]
 
 export * from "./currencies.js";
+export * from "./categories.js";
 export * from "./money.js";
 export * from "./types.js";
 export * from "./legs.js";
+export * from "./engine.js";
+export * from "./recurring.js";
 export * from "./schemas.js";
