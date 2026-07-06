@@ -89,7 +89,7 @@ export async function runMonthEnd(asOf = new Date().toISOString().slice(0, 10)):
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runMonthEnd().catch((err) => {
+  runMonthEnd(process.argv[2]).catch((err) => {
     console.error("[month-end] failed:", err);
     process.exit(1);
   });

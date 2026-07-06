@@ -410,7 +410,7 @@ export async function runDaily(asOf = new Date().toISOString().slice(0, 10)): Pr
 
 // Auto-run only when invoked directly (so tests can import runDaily).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runDaily().catch((err) => {
+  runDaily(process.argv[2]).catch((err) => {
     console.error("[daily] failed:", err);
     process.exit(1);
   });

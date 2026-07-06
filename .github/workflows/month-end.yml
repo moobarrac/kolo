@@ -1,0 +1,28 @@
+name: Month-end job
+
+# Revalues foreign-currency accounts to the closing rate (§6). Runs early on the
+# 1st and passes YESTERDAY's date, i.e. the last day of the month being closed.
+on:
+  schedule:
+    - cron: "30 0 1 * *" # 00:30 UTC on the 1st of each month
+  workflow_dispatch:
+
+concurrency:
+  group: month-end-job
+  cancel-in-progress: false
+
+jobs:
+  month-end:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Close previous month
+        run: npm run job:month-end --workspace backend -- "$(date -u -d 'yesterday' +%F)"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
