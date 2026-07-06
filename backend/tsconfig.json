@@ -8,5 +8,5 @@
       "@kolo/shared": ["../shared/src/index.ts"]
     }
   },
-  "include": ["jobs", "supabase/seed"]
+  "include": ["jobs", "scripts", "supabase/seed"]
 }

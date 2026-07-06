@@ -6,14 +6,17 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      // Semantic tokens resolve to CSS variables (see index.css) so the same
+      // class works in light and dark. `<alpha-value>` keeps `/opacity` modifiers.
       colors: {
-        ink: "#16271E",
-        paper: "#F3F4F0",
-        surface: "#FFFFFF",
-        forest: "#20503B",
-        brass: "#B07D2B",
-        gain: "#20503B", // unrealized appreciation / inflow
-        loss: "#A23C2B", // money leaving / unrealized loss (clay)
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        canvas: "rgb(var(--color-canvas) / <alpha-value>)",
+        paper: "rgb(var(--color-paper) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        forest: "rgb(var(--color-forest) / <alpha-value>)",
+        brass: "rgb(var(--color-brass) / <alpha-value>)",
+        gain: "rgb(var(--color-gain) / <alpha-value>)", // unrealized appreciation / inflow
+        loss: "rgb(var(--color-loss) / <alpha-value>)", // money leaving / unrealized loss (clay)
       },
       fontFamily: {
         display: ['"Space Grotesk"', "system-ui", "sans-serif"],
