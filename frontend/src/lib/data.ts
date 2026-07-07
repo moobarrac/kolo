@@ -26,7 +26,11 @@ import { todayIso } from "./dates";
 import { toast } from "./toast";
 
 async function systemAccountId(tag: string): Promise<string> {
-  const { data, error } = await supabase.from("accounts").select("id").eq("system_tag", tag).single();
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("id")
+    .eq("system_tag", tag)
+    .single();
   if (error) throw error;
   return data.id as string;
 }
@@ -99,7 +103,10 @@ export function useCreateAccount() {
       if (error) throw error;
       return data.id as string;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); toast.success("Account added"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success("Account added");
+    },
   });
 }
 
@@ -110,17 +117,39 @@ export function useAddCommonCategories() {
   return useMutation({
     mutationFn: async (): Promise<number> => {
       const userId = session!.user.id;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
       const base = prof?.base_currency ?? "NGN";
       const { data: existing, error } = await supabase
-        .from("accounts").select("name, type").in("type", ["expense", "income"]);
+        .from("accounts")
+        .select("name, type")
+        .in("type", ["expense", "income"]);
       if (error) throw error;
       const have = new Set((existing ?? []).map((a) => `${a.type}:${a.name}`));
-      const rows: { user_id: string; name: string; type: string; currency: string }[] = [];
+      const rows: {
+        user_id: string;
+        name: string;
+        type: string;
+        currency: string;
+      }[] = [];
       for (const c of DEFAULT_EXPENSE_CATEGORIES)
-        if (!have.has(`expense:${c}`)) rows.push({ user_id: userId, name: c, type: "expense", currency: base });
+        if (!have.has(`expense:${c}`))
+          rows.push({
+            user_id: userId,
+            name: c,
+            type: "expense",
+            currency: base,
+          });
       for (const c of DEFAULT_INCOME_SOURCES)
-        if (!have.has(`income:${c}`)) rows.push({ user_id: userId, name: c, type: "income", currency: base });
+        if (!have.has(`income:${c}`))
+          rows.push({
+            user_id: userId,
+            name: c,
+            type: "income",
+            currency: base,
+          });
       if (rows.length) {
         const { error: insErr } = await supabase.from("accounts").insert(rows);
         if (insErr) throw insErr;
@@ -185,9 +214,16 @@ export function useOverview(from: string, to: string) {
   return useQuery({
     queryKey: ["overview", from, to, userId],
     queryFn: async (): Promise<{ overview: OverviewData; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_overview", { p_user: userId!, p_from: from, p_to: to });
+      const { data, error } = await supabase.rpc("fn_overview", {
+        p_user: userId!,
+        p_from: from,
+        p_to: to,
+      });
       if (error) throw error;
-      return { overview: data as OverviewData, base: profile?.base_currency ?? "NGN" };
+      return {
+        overview: data as OverviewData,
+        base: profile?.base_currency ?? "NGN",
+      };
     },
     enabled: !!userId && !!profile,
   });
@@ -224,9 +260,16 @@ export function useCashFlow(from: string, to: string) {
   return useQuery({
     queryKey: ["cashflow", from, to, userId],
     queryFn: async (): Promise<{ flow: CashFlowData; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_cash_flow", { p_user: userId!, p_from: from, p_to: to });
+      const { data, error } = await supabase.rpc("fn_cash_flow", {
+        p_user: userId!,
+        p_from: from,
+        p_to: to,
+      });
       if (error) throw error;
-      return { flow: data as CashFlowData, base: profile?.base_currency ?? "NGN" };
+      return {
+        flow: data as CashFlowData,
+        base: profile?.base_currency ?? "NGN",
+      };
     },
     enabled: !!userId && !!profile,
   });
@@ -249,7 +292,9 @@ export function useRecurringRules() {
     queryFn: async (): Promise<RecurringRuleRow[]> => {
       const { data, error } = await supabase
         .from("recurring_rules")
-        .select("id, name, frequency, interval, next_run, auto_post, is_active, template")
+        .select(
+          "id, name, frequency, interval, next_run, auto_post, is_active, template",
+        )
         .order("next_run");
       if (error) throw error;
       return data as RecurringRuleRow[];
@@ -290,7 +335,10 @@ export function useCreateRecurringRule() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["recurring"] }); toast.success("Recurring set up"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recurring"] });
+      toast.success("Recurring set up");
+    },
   });
 }
 
@@ -313,9 +361,15 @@ export function useAssets() {
   return useQuery({
     queryKey: ["assets", userId],
     queryFn: async (): Promise<{ assets: AssetRow[]; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_assets", { p_user: userId!, p_as_of: todayIso() });
+      const { data, error } = await supabase.rpc("fn_assets", {
+        p_user: userId!,
+        p_as_of: todayIso(),
+      });
       if (error) throw error;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
       return { assets: data as AssetRow[], base: prof?.base_currency ?? "NGN" };
     },
     enabled: !!userId,
@@ -331,7 +385,8 @@ export function useCreateAsset() {
       assetClass: AssetClass;
       currency: string;
       costMinor: bigint;
-      fundingAccountId: string;
+      fundingAccountId?: string; // required only when buying (owned = false)
+      owned?: boolean; // already own it → book against opening equity, don't spend cash
       purchaseDate: string;
       fxRate: number;
       quantity?: number;
@@ -340,21 +395,64 @@ export function useCreateAsset() {
       const userId = session!.user.id;
       const { data: acct, error: aErr } = await supabase
         .from("accounts")
-        .insert({ user_id: userId, name: input.name, type: "asset", subtype: input.assetClass, currency: input.currency })
-        .select("id").single();
+        .insert({
+          user_id: userId,
+          name: input.name,
+          type: "asset",
+          subtype: input.assetClass,
+          currency: input.currency,
+        })
+        .select("id")
+        .single();
       if (aErr) throw aErr;
       const { error: insErr } = await supabase.from("assets").insert({
-        user_id: userId, account_id: acct.id, name: input.name, asset_class: input.assetClass,
-        purchase_date: input.purchaseDate, purchase_price_minor: Number(input.costMinor),
-        purchase_currency: input.currency, quantity: input.quantity ?? null, unit: input.unit ?? null,
+        user_id: userId,
+        account_id: acct.id,
+        name: input.name,
+        asset_class: input.assetClass,
+        purchase_date: input.purchaseDate,
+        purchase_price_minor: Number(input.costMinor),
+        purchase_currency: input.currency,
+        quantity: input.quantity ?? null,
+        unit: input.unit ?? null,
       });
       if (insErr) throw insErr;
-      const lines = buildAssetPurchaseLegs({
-        assetAccountId: acct.id, fundingAccountId: input.fundingAccountId, currency: input.currency,
-        costMinor: input.costMinor, fxRate: input.fxRate, baseCurrency: input.currency,
-      });
+      // Already own it: Dr asset · Cr Opening Balance Equity (adds to net worth,
+      // spends nothing). Bought it: Dr asset · Cr the funding account.
+      const { kind, description, lines } = input.owned
+        ? {
+            kind: "opening_balance",
+            description: `${input.name} (already owned)`,
+            lines: buildOpeningBalanceLegs(
+              [
+                {
+                  accountId: acct.id,
+                  currency: input.currency,
+                  amountMinor: input.costMinor,
+                  fxRate: input.fxRate,
+                  side: "asset" as const,
+                },
+              ],
+              await systemAccountId("opening_balance_equity"),
+              input.currency,
+            ),
+          }
+        : {
+            kind: "asset_purchase",
+            description: `Bought ${input.name}`,
+            lines: buildAssetPurchaseLegs({
+              assetAccountId: acct.id,
+              fundingAccountId: input.fundingAccountId!,
+              currency: input.currency,
+              costMinor: input.costMinor,
+              fxRate: input.fxRate,
+              baseCurrency: input.currency,
+            }),
+          };
       const { error: pErr } = await supabase.rpc("post_entry", {
-        p_kind: "asset_purchase", p_entry_date: input.purchaseDate, p_description: `Bought ${input.name}`,
+        p_kind: kind,
+        p_entry_date: input.purchaseDate,
+        p_description: description,
         p_lines: toRpcLines(lines),
       });
       if (pErr) throw pErr;
@@ -372,24 +470,46 @@ export function useRevalueAsset() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { assetId: string; accountId: string; currency: string; newValueMinor: bigint; asOfDate: string }) => {
+    mutationFn: async (input: {
+      assetId: string;
+      accountId: string;
+      currency: string;
+      newValueMinor: bigint;
+      asOfDate: string;
+    }) => {
       const reserveId = await systemAccountId("asset_revaluation_reserve");
-      const base = (await supabase.from("profiles").select("base_currency").single()).data?.base_currency ?? "NGN";
-      const { data: carried, error: bErr } = await supabase.rpc("fn_account_balance", { p_account: input.accountId, p_as_of: input.asOfDate });
+      const base =
+        (await supabase.from("profiles").select("base_currency").single()).data
+          ?.base_currency ?? "NGN";
+      const { data: carried, error: bErr } = await supabase.rpc(
+        "fn_account_balance",
+        { p_account: input.accountId, p_as_of: input.asOfDate },
+      );
       if (bErr) throw bErr;
       const delta = input.newValueMinor - BigInt(carried ?? 0);
       if (delta === 0n) return;
       const lines = buildAssetRevaluationLegs({
-        assetAccountId: input.accountId, reserveAccountId: reserveId, deltaMinor: delta,
-        currency: input.currency, fxRate: 1, baseCurrency: base,
+        assetAccountId: input.accountId,
+        reserveAccountId: reserveId,
+        deltaMinor: delta,
+        currency: input.currency,
+        fxRate: 1,
+        baseCurrency: base,
       });
       const { data: entryId, error: pErr } = await supabase.rpc("post_entry", {
-        p_kind: "asset_revaluation", p_entry_date: input.asOfDate, p_description: "Updated value", p_lines: toRpcLines(lines),
+        p_kind: "asset_revaluation",
+        p_entry_date: input.asOfDate,
+        p_description: "Updated value",
+        p_lines: toRpcLines(lines),
       });
       if (pErr) throw pErr;
       await supabase.from("asset_valuations").insert({
-        user_id: session!.user.id, asset_id: input.assetId, as_of_date: input.asOfDate,
-        value_minor: Number(input.newValueMinor), currency: input.currency, valuation_entry_id: entryId,
+        user_id: session!.user.id,
+        asset_id: input.assetId,
+        as_of_date: input.asOfDate,
+        value_minor: Number(input.newValueMinor),
+        currency: input.currency,
+        valuation_entry_id: entryId,
       });
     },
     onSuccess: () => {
@@ -416,11 +536,23 @@ export function useLiabilities() {
   const userId = session?.user.id;
   return useQuery({
     queryKey: ["liabilities", userId],
-    queryFn: async (): Promise<{ liabilities: LiabilityRow[]; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_liabilities", { p_user: userId!, p_as_of: todayIso() });
+    queryFn: async (): Promise<{
+      liabilities: LiabilityRow[];
+      base: string;
+    }> => {
+      const { data, error } = await supabase.rpc("fn_liabilities", {
+        p_user: userId!,
+        p_as_of: todayIso(),
+      });
       if (error) throw error;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
-      return { liabilities: data as LiabilityRow[], base: prof?.base_currency ?? "NGN" };
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
+      return {
+        liabilities: data as LiabilityRow[],
+        base: prof?.base_currency ?? "NGN",
+      };
     },
     enabled: !!userId,
   });
@@ -430,26 +562,57 @@ export function useCreateLiability() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { name: string; type: string; currency: string; balanceMinor: bigint; interestRate?: number; date: string }) => {
+    mutationFn: async (input: {
+      name: string;
+      type: string;
+      currency: string;
+      balanceMinor: bigint;
+      interestRate?: number;
+      date: string;
+    }) => {
       const userId = session!.user.id;
       const obe = await systemAccountId("opening_balance_equity");
       const { data: acct, error: aErr } = await supabase
         .from("accounts")
-        .insert({ user_id: userId, name: input.name, type: "liability", subtype: input.type, currency: input.currency })
-        .select("id").single();
+        .insert({
+          user_id: userId,
+          name: input.name,
+          type: "liability",
+          subtype: input.type,
+          currency: input.currency,
+        })
+        .select("id")
+        .single();
       if (aErr) throw aErr;
       const { error: insErr } = await supabase.from("liabilities").insert({
-        user_id: userId, account_id: acct.id, name: input.name, type: input.type, currency: input.currency,
-        original_principal_minor: Number(input.balanceMinor), interest_rate: input.interestRate ?? null,
+        user_id: userId,
+        account_id: acct.id,
+        name: input.name,
+        type: input.type,
+        currency: input.currency,
+        original_principal_minor: Number(input.balanceMinor),
+        interest_rate: input.interestRate ?? null,
       });
       if (insErr) throw insErr;
       // Record the current balance owed as an opening balance (Cr liability · Dr OBE).
       const lines = buildOpeningBalanceLegs(
-        [{ accountId: acct.id, currency: input.currency, amountMinor: input.balanceMinor, fxRate: 1, side: "liability" }],
-        obe, input.currency,
+        [
+          {
+            accountId: acct.id,
+            currency: input.currency,
+            amountMinor: input.balanceMinor,
+            fxRate: 1,
+            side: "liability",
+          },
+        ],
+        obe,
+        input.currency,
       );
       const { error: pErr } = await supabase.rpc("post_entry", {
-        p_kind: "opening_balance", p_entry_date: input.date, p_description: `${input.name} balance`, p_lines: toRpcLines(lines),
+        p_kind: "opening_balance",
+        p_entry_date: input.date,
+        p_description: `${input.name} balance`,
+        p_lines: toRpcLines(lines),
       });
       if (pErr) throw pErr;
     },
@@ -466,26 +629,54 @@ export function usePayLoan() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { loanAccountId: string; cashAccountId: string; currency: string; principalMinor: bigint; interestMinor: bigint; date: string }) => {
+    mutationFn: async (input: {
+      loanAccountId: string;
+      cashAccountId: string;
+      currency: string;
+      principalMinor: bigint;
+      interestMinor: bigint;
+      date: string;
+    }) => {
       const userId = session!.user.id;
       // Find or create a "Loan interest" expense account in this currency.
       let interestId: string;
       const { data: existing } = await supabase
-        .from("accounts").select("id").eq("type", "expense").eq("name", "Loan interest").eq("currency", input.currency).maybeSingle();
+        .from("accounts")
+        .select("id")
+        .eq("type", "expense")
+        .eq("name", "Loan interest")
+        .eq("currency", input.currency)
+        .maybeSingle();
       if (existing) interestId = existing.id;
       else {
         const { data: made, error } = await supabase
-          .from("accounts").insert({ user_id: userId, name: "Loan interest", type: "expense", currency: input.currency })
-          .select("id").single();
+          .from("accounts")
+          .insert({
+            user_id: userId,
+            name: "Loan interest",
+            type: "expense",
+            currency: input.currency,
+          })
+          .select("id")
+          .single();
         if (error) throw error;
         interestId = made.id;
       }
       const lines = buildLoanPaymentLegs({
-        loanAccountId: input.loanAccountId, interestExpenseAccountId: interestId, cashAccountId: input.cashAccountId,
-        currency: input.currency, principalMinor: input.principalMinor, interestMinor: input.interestMinor, fxRate: 1, baseCurrency: input.currency,
+        loanAccountId: input.loanAccountId,
+        interestExpenseAccountId: interestId,
+        cashAccountId: input.cashAccountId,
+        currency: input.currency,
+        principalMinor: input.principalMinor,
+        interestMinor: input.interestMinor,
+        fxRate: 1,
+        baseCurrency: input.currency,
       });
       const { error: pErr } = await supabase.rpc("post_entry", {
-        p_kind: "loan_payment", p_entry_date: input.date, p_description: "Loan payment", p_lines: toRpcLines(lines),
+        p_kind: "loan_payment",
+        p_entry_date: input.date,
+        p_description: "Loan payment",
+        p_lines: toRpcLines(lines),
       });
       if (pErr) throw pErr;
     },
@@ -516,11 +707,23 @@ export function useReceivables() {
   const userId = session?.user.id;
   return useQuery({
     queryKey: ["receivables", userId],
-    queryFn: async (): Promise<{ receivables: ReceivableRow[]; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_receivables", { p_user: userId!, p_as_of: todayIso() });
+    queryFn: async (): Promise<{
+      receivables: ReceivableRow[];
+      base: string;
+    }> => {
+      const { data, error } = await supabase.rpc("fn_receivables", {
+        p_user: userId!,
+        p_as_of: todayIso(),
+      });
       if (error) throw error;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
-      return { receivables: data as ReceivableRow[], base: prof?.base_currency ?? "NGN" };
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
+      return {
+        receivables: data as ReceivableRow[],
+        base: prof?.base_currency ?? "NGN",
+      };
     },
     enabled: !!userId,
   });
@@ -541,21 +744,39 @@ export function useCreateReceivable() {
       const userId = session!.user.id;
       const { data: acct, error: aErr } = await supabase
         .from("accounts")
-        .insert({ user_id: userId, name: `Owed by ${input.counterpartyName}`, type: "asset", subtype: "receivable", currency: input.currency })
-        .select("id").single();
+        .insert({
+          user_id: userId,
+          name: `Owed by ${input.counterpartyName}`,
+          type: "asset",
+          subtype: "receivable",
+          currency: input.currency,
+        })
+        .select("id")
+        .single();
       if (aErr) throw aErr;
       const { error: insErr } = await supabase.from("receivables").insert({
-        user_id: userId, account_id: acct.id, counterparty_name: input.counterpartyName,
-        principal_minor: Number(input.amountMinor), currency: input.currency,
-        lent_date: input.lentDate, due_date: input.dueDate ?? null,
+        user_id: userId,
+        account_id: acct.id,
+        counterparty_name: input.counterpartyName,
+        principal_minor: Number(input.amountMinor),
+        currency: input.currency,
+        lent_date: input.lentDate,
+        due_date: input.dueDate ?? null,
       });
       if (insErr) throw insErr;
       const lines = buildReceivableIssueLegs({
-        receivableAccountId: acct.id, fundingAccountId: input.fundingAccountId, currency: input.currency,
-        amountMinor: input.amountMinor, fxRate: 1, baseCurrency: input.currency,
+        receivableAccountId: acct.id,
+        fundingAccountId: input.fundingAccountId,
+        currency: input.currency,
+        amountMinor: input.amountMinor,
+        fxRate: 1,
+        baseCurrency: input.currency,
       });
       const { error: pErr } = await supabase.rpc("post_entry", {
-        p_kind: "receivable_issue", p_entry_date: input.lentDate, p_description: `Lent ${input.counterpartyName}`, p_lines: toRpcLines(lines),
+        p_kind: "receivable_issue",
+        p_entry_date: input.lentDate,
+        p_description: `Lent ${input.counterpartyName}`,
+        p_lines: toRpcLines(lines),
       });
       if (pErr) throw pErr;
     },
@@ -568,8 +789,14 @@ export function useCreateReceivable() {
   });
 }
 
-async function refreshReceivableStatus(receivableId: string, accountId: string) {
-  const { data: bal } = await supabase.rpc("fn_account_balance", { p_account: accountId, p_as_of: todayIso() });
+async function refreshReceivableStatus(
+  receivableId: string,
+  accountId: string,
+) {
+  const { data: bal } = await supabase.rpc("fn_account_balance", {
+    p_account: accountId,
+    p_as_of: todayIso(),
+  });
   const status = Number(bal ?? 0) <= 0 ? "settled" : "partially_paid";
   await supabase.from("receivables").update({ status }).eq("id", receivableId);
 }
@@ -577,14 +804,26 @@ async function refreshReceivableStatus(receivableId: string, accountId: string) 
 export function useReceivablePayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { receivable: ReceivableRow; cashAccountId: string; amountMinor: bigint; date: string }) => {
+    mutationFn: async (input: {
+      receivable: ReceivableRow;
+      cashAccountId: string;
+      amountMinor: bigint;
+      date: string;
+    }) => {
       const r = input.receivable;
       const lines = buildReceivablePaymentLegs({
-        receivableAccountId: r.account_id, cashAccountId: input.cashAccountId, currency: r.currency,
-        amountMinor: input.amountMinor, fxRate: 1, baseCurrency: r.currency,
+        receivableAccountId: r.account_id,
+        cashAccountId: input.cashAccountId,
+        currency: r.currency,
+        amountMinor: input.amountMinor,
+        fxRate: 1,
+        baseCurrency: r.currency,
       });
       const { error } = await supabase.rpc("post_entry", {
-        p_kind: "receivable_payment", p_entry_date: input.date, p_description: `${r.counterparty_name} repaid`, p_lines: toRpcLines(lines),
+        p_kind: "receivable_payment",
+        p_entry_date: input.date,
+        p_description: `${r.counterparty_name} repaid`,
+        p_lines: toRpcLines(lines),
       });
       if (error) throw error;
       await refreshReceivableStatus(r.id, r.account_id);
@@ -605,14 +844,24 @@ export function useReceivableWriteoff() {
       if (r.outstanding_minor <= 0) return;
       const badDebt = await systemAccountId("bad_debt");
       const lines = buildReceivableWriteoffLegs({
-        receivableAccountId: r.account_id, badDebtAccountId: badDebt, currency: r.currency,
-        amountMinor: BigInt(r.outstanding_minor), fxRate: 1, baseCurrency: r.currency,
+        receivableAccountId: r.account_id,
+        badDebtAccountId: badDebt,
+        currency: r.currency,
+        amountMinor: BigInt(r.outstanding_minor),
+        fxRate: 1,
+        baseCurrency: r.currency,
       });
       const { error } = await supabase.rpc("post_entry", {
-        p_kind: "receivable_writeoff", p_entry_date: input.date, p_description: `Wrote off ${r.counterparty_name}`, p_lines: toRpcLines(lines),
+        p_kind: "receivable_writeoff",
+        p_entry_date: input.date,
+        p_description: `Wrote off ${r.counterparty_name}`,
+        p_lines: toRpcLines(lines),
       });
       if (error) throw error;
-      await supabase.from("receivables").update({ status: "written_off" }).eq("id", r.id);
+      await supabase
+        .from("receivables")
+        .update({ status: "written_off" })
+        .eq("id", r.id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["receivables"] });
@@ -653,7 +902,10 @@ export function useDismissNotification() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("notifications").update({ status: "dismissed" }).eq("id", id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ status: "dismissed" })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
@@ -664,7 +916,10 @@ export function useDismissAllNotifications() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("notifications").update({ status: "dismissed" }).neq("status", "dismissed");
+      const { error } = await supabase
+        .from("notifications")
+        .update({ status: "dismissed" })
+        .neq("status", "dismissed");
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
@@ -698,7 +953,12 @@ export function useUpsertRate() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { rateDate: string; from: string; to: string; rate: number }) => {
+    mutationFn: async (input: {
+      rateDate: string;
+      from: string;
+      to: string;
+      rate: number;
+    }) => {
       const { error } = await supabase.from("exchange_rates").upsert(
         {
           user_id: session!.user.id,
@@ -712,7 +972,10 @@ export function useUpsertRate() {
       );
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rates"] }); toast.success("Rate saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rates"] });
+      toast.success("Rate saved");
+    },
   });
 }
 
@@ -729,16 +992,30 @@ export function useConvertCurrency() {
       date: string;
     }) => {
       const realizedFx = await systemAccountId("realized_fx");
-      const { data: nat } = await supabase.rpc("fn_account_balance", { p_account: input.sourceAccountId, p_as_of: input.date });
-      const { data: bas } = await supabase.rpc("fn_account_base_balance", { p_account: input.sourceAccountId, p_as_of: input.date });
+      const { data: nat } = await supabase.rpc("fn_account_balance", {
+        p_account: input.sourceAccountId,
+        p_as_of: input.date,
+      });
+      const { data: bas } = await supabase.rpc("fn_account_base_balance", {
+        p_account: input.sourceAccountId,
+        p_as_of: input.date,
+      });
       const lines = buildFxConversionLegs({
-        destAccountId: input.destAccountId, proceedsMinor: input.proceedsMinor,
-        sourceAccountId: input.sourceAccountId, sourceCurrency: input.sourceCurrency, soldMinor: input.soldMinor,
-        sourceNativeBalanceMinor: BigInt(nat ?? 0), sourceBaseBalanceMinor: BigInt(bas ?? 0),
-        realizedFxAccountId: realizedFx, baseCurrency: input.baseCurrency,
+        destAccountId: input.destAccountId,
+        proceedsMinor: input.proceedsMinor,
+        sourceAccountId: input.sourceAccountId,
+        sourceCurrency: input.sourceCurrency,
+        soldMinor: input.soldMinor,
+        sourceNativeBalanceMinor: BigInt(nat ?? 0),
+        sourceBaseBalanceMinor: BigInt(bas ?? 0),
+        realizedFxAccountId: realizedFx,
+        baseCurrency: input.baseCurrency,
       });
       const { error } = await supabase.rpc("post_entry", {
-        p_kind: "fx_conversion", p_entry_date: input.date, p_description: "Currency conversion", p_lines: toRpcLines(lines),
+        p_kind: "fx_conversion",
+        p_entry_date: input.date,
+        p_description: "Currency conversion",
+        p_lines: toRpcLines(lines),
       });
       if (error) throw error;
     },
@@ -770,9 +1047,15 @@ export function useGoals() {
   return useQuery({
     queryKey: ["goals", userId],
     queryFn: async (): Promise<{ goals: GoalRow[]; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_goals", { p_user: userId!, p_as_of: todayIso() });
+      const { data, error } = await supabase.rpc("fn_goals", {
+        p_user: userId!,
+        p_as_of: todayIso(),
+      });
       if (error) throw error;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
       return { goals: data as GoalRow[], base: prof?.base_currency ?? "NGN" };
     },
     enabled: !!userId,
@@ -796,18 +1079,28 @@ export function useCreateGoal() {
       // measure how much has been paid down since.
       let baseline = input.baselineMinor ?? 0n;
       if (input.type === "debt_payoff" && input.linkedAccountId) {
-        const { data: bal } = await supabase.rpc("fn_account_balance", { p_account: input.linkedAccountId, p_as_of: todayIso() });
+        const { data: bal } = await supabase.rpc("fn_account_balance", {
+          p_account: input.linkedAccountId,
+          p_as_of: todayIso(),
+        });
         baseline = BigInt(-(Number(bal) || 0));
       }
       const { error } = await supabase.from("goals").insert({
-        user_id: session!.user.id, name: input.name, type: input.type,
-        target_minor: Number(input.targetMinor), currency: input.currency,
-        target_date: input.targetDate ?? null, linked_account_id: input.linkedAccountId ?? null,
+        user_id: session!.user.id,
+        name: input.name,
+        type: input.type,
+        target_minor: Number(input.targetMinor),
+        currency: input.currency,
+        target_date: input.targetDate ?? null,
+        linked_account_id: input.linkedAccountId ?? null,
         baseline_minor: Number(baseline),
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["goals"] }); toast.success("Goal set"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["goals"] });
+      toast.success("Goal set");
+    },
   });
 }
 
@@ -824,7 +1117,9 @@ export function usePeriodLocks() {
     queryKey: ["locks"],
     queryFn: async (): Promise<PeriodLock[]> => {
       const { data, error } = await supabase
-        .from("period_locks").select("id, period_start, period_end, note").order("period_end", { ascending: false });
+        .from("period_locks")
+        .select("id, period_start, period_end, note")
+        .order("period_end", { ascending: false });
       if (error) throw error;
       return data as PeriodLock[];
     },
@@ -835,13 +1130,23 @@ export function useLockPeriod() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { start: string; end: string; note?: string }) => {
+    mutationFn: async (input: {
+      start: string;
+      end: string;
+      note?: string;
+    }) => {
       const { error } = await supabase.from("period_locks").insert({
-        user_id: session!.user.id, period_start: input.start, period_end: input.end, note: input.note ?? null,
+        user_id: session!.user.id,
+        period_start: input.start,
+        period_end: input.end,
+        note: input.note ?? null,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["locks"] }); toast.success("Period locked"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["locks"] });
+      toast.success("Period locked");
+    },
   });
 }
 
@@ -849,15 +1154,24 @@ export function useUnlockPeriod() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("period_locks").delete().eq("id", id);
+      const { error } = await supabase
+        .from("period_locks")
+        .delete()
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["locks"] }); toast.success("Unlocked"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["locks"] });
+      toast.success("Unlocked");
+    },
   });
 }
 
 // ── Reports (§13.5, Phase 6) ─────────────────────────────────────────────────
-export interface AllocationSlice { class: string; total: number }
+export interface AllocationSlice {
+  class: string;
+  total: number;
+}
 
 export function useAssetAllocation() {
   const { session } = useAuth();
@@ -866,15 +1180,28 @@ export function useAssetAllocation() {
     queryKey: ["allocation", userId],
     enabled: !!userId,
     queryFn: async (): Promise<{ slices: AllocationSlice[]; base: string }> => {
-      const { data, error } = await supabase.rpc("fn_asset_allocation", { p_user: userId!, p_as_of: todayIso() });
+      const { data, error } = await supabase.rpc("fn_asset_allocation", {
+        p_user: userId!,
+        p_as_of: todayIso(),
+      });
       if (error) throw error;
-      const { data: prof } = await supabase.from("profiles").select("base_currency").single();
-      return { slices: data as AllocationSlice[], base: prof?.base_currency ?? "NGN" };
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("base_currency")
+        .single();
+      return {
+        slices: data as AllocationSlice[],
+        base: prof?.base_currency ?? "NGN",
+      };
     },
   });
 }
 
-export interface MonthlyFlow { month: string; income: number; expense: number }
+export interface MonthlyFlow {
+  month: string;
+  income: number;
+  expense: number;
+}
 
 export function useMonthlyFlow(from: string, to: string) {
   const { session } = useAuth();
@@ -883,7 +1210,11 @@ export function useMonthlyFlow(from: string, to: string) {
     queryKey: ["monthlyflow", from, to, userId],
     enabled: !!userId,
     queryFn: async (): Promise<MonthlyFlow[]> => {
-      const { data, error } = await supabase.rpc("fn_monthly_flow", { p_user: userId!, p_from: from, p_to: to });
+      const { data, error } = await supabase.rpc("fn_monthly_flow", {
+        p_user: userId!,
+        p_from: from,
+        p_to: to,
+      });
       if (error) throw error;
       return data as MonthlyFlow[];
     },
@@ -905,10 +1236,10 @@ export function useNetWorthTimeline() {
 }
 
 export interface TransactionFilters {
-  kinds?: string[];   // restrict to these entry kinds
-  from?: string;      // ISO date (inclusive)
-  to?: string;        // ISO date (inclusive)
-  search?: string;    // matches the description
+  kinds?: string[]; // restrict to these entry kinds
+  from?: string; // ISO date (inclusive)
+  to?: string; // ISO date (inclusive)
+  search?: string; // matches the description
   limit?: number;
 }
 
@@ -919,13 +1250,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
     queryFn: async (): Promise<TransactionRow[]> => {
       let q = supabase
         .from("journal_entries")
-        .select("id, entry_date, description, kind, journal_lines(amount_minor, currency, accounts(name, type))")
+        .select(
+          "id, entry_date, description, kind, journal_lines(amount_minor, currency, accounts(name, type))",
+        )
         .eq("status", "posted");
       if (kinds && kinds.length) q = q.in("kind", kinds);
       if (from) q = q.gte("entry_date", from);
       if (to) q = q.lte("entry_date", to);
-      if (search && search.trim()) q = q.ilike("description", `%${search.trim()}%`);
-      const { data, error } = await q.order("entry_date", { ascending: false }).limit(limit);
+      if (search && search.trim())
+        q = q.ilike("description", `%${search.trim()}%`);
+      const { data, error } = await q
+        .order("entry_date", { ascending: false })
+        .limit(limit);
       if (error) throw error;
       return data as unknown as TransactionRow[];
     },
@@ -939,17 +1275,31 @@ export function useTransactions(filters: TransactionFilters = {}) {
 export function useSetLowBalanceAlert() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { accountId: string; thresholdMinor: bigint | null }) => {
+    mutationFn: async (input: {
+      accountId: string;
+      thresholdMinor: bigint | null;
+    }) => {
       const { data: cur, error: readErr } = await supabase
-        .from("accounts").select("metadata").eq("id", input.accountId).single();
+        .from("accounts")
+        .select("metadata")
+        .eq("id", input.accountId)
+        .single();
       if (readErr) throw readErr;
-      const metadata: Record<string, unknown> = { ...((cur?.metadata as Record<string, unknown>) ?? {}) };
+      const metadata: Record<string, unknown> = {
+        ...((cur?.metadata as Record<string, unknown>) ?? {}),
+      };
       if (input.thresholdMinor == null) delete metadata.low_balance_minor;
       else metadata.low_balance_minor = Number(input.thresholdMinor);
-      const { error } = await supabase.from("accounts").update({ metadata }).eq("id", input.accountId);
+      const { error } = await supabase
+        .from("accounts")
+        .update({ metadata })
+        .eq("id", input.accountId);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); toast.success("Alert saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success("Alert saved");
+    },
   });
 }
 
@@ -958,7 +1308,7 @@ export interface ReconcileLine {
   id: string;
   entry_date: string;
   description: string | null;
-  amount_minor: number;   // signed, native to the account
+  amount_minor: number; // signed, native to the account
   cleared: boolean;
 }
 export interface ReconciliationRow {
@@ -972,13 +1322,22 @@ export interface ReconciliationRow {
 
 // Posted lines for an account up to the statement date. By default only the
 // uncleared ones (the actionable list); pass includeCleared to show everything.
-export function useReconcileLines(accountId: string | null, asOf: string, includeCleared = false) {
+export function useReconcileLines(
+  accountId: string | null,
+  asOf: string,
+  includeCleared = false,
+) {
   return useQuery({
     queryKey: ["reconcile-lines", accountId, asOf, includeCleared],
     enabled: !!accountId,
     queryFn: async (): Promise<ReconcileLine[]> => {
-      const fn = includeCleared ? "fn_reconcile_lines" : "fn_reconcile_open_lines";
-      const { data, error } = await supabase.rpc(fn, { p_account: accountId!, p_as_of: asOf });
+      const fn = includeCleared
+        ? "fn_reconcile_lines"
+        : "fn_reconcile_open_lines";
+      const { data, error } = await supabase.rpc(fn, {
+        p_account: accountId!,
+        p_as_of: asOf,
+      });
       if (error) throw error;
       return data as ReconcileLine[];
     },
@@ -992,7 +1351,10 @@ export function useClearedBalance(accountId: string | null, asOf: string) {
     queryKey: ["cleared-balance", accountId, asOf],
     enabled: !!accountId,
     queryFn: async (): Promise<bigint> => {
-      const { data, error } = await supabase.rpc("fn_cleared_balance", { p_account: accountId!, p_as_of: asOf });
+      const { data, error } = await supabase.rpc("fn_cleared_balance", {
+        p_account: accountId!,
+        p_as_of: asOf,
+      });
       if (error) throw error;
       return BigInt(data ?? 0);
     },
@@ -1005,7 +1367,10 @@ export function useAccountBalance(accountId: string | null, asOf?: string) {
     queryKey: ["account-balance", accountId, asOf ?? "today"],
     enabled: !!accountId,
     queryFn: async (): Promise<bigint> => {
-      const { data, error } = await supabase.rpc("fn_account_balance", { p_account: accountId!, p_as_of: asOf ?? todayIso() });
+      const { data, error } = await supabase.rpc("fn_account_balance", {
+        p_account: accountId!,
+        p_as_of: asOf ?? todayIso(),
+      });
       if (error) throw error;
       return BigInt(data ?? 0);
     },
@@ -1020,7 +1385,10 @@ export function useToggleCleared() {
     mutationFn: async (input: { lineId: string; cleared: boolean }) => {
       const { error } = await supabase
         .from("journal_lines")
-        .update({ cleared: input.cleared, reconciled_at: input.cleared ? new Date().toISOString() : null })
+        .update({
+          cleared: input.cleared,
+          reconciled_at: input.cleared ? new Date().toISOString() : null,
+        })
         .eq("id", input.lineId);
       if (error) throw error;
     },
@@ -1038,7 +1406,9 @@ export function useReconciliations(accountId: string | null) {
     queryFn: async (): Promise<ReconciliationRow[]> => {
       const { data, error } = await supabase
         .from("reconciliations")
-        .select("id, statement_date, statement_balance_minor, reconciled_balance_minor, status, completed_at")
+        .select(
+          "id, statement_date, statement_balance_minor, reconciled_balance_minor, status, completed_at",
+        )
         .eq("account_id", accountId!)
         .order("statement_date", { ascending: false });
       if (error) throw error;
@@ -1053,7 +1423,10 @@ export function useCompleteReconciliation() {
   const { session } = useAuth();
   return useMutation({
     mutationFn: async (input: {
-      accountId: string; statementDate: string; statementBalanceMinor: bigint; reconciledBalanceMinor: bigint;
+      accountId: string;
+      statementDate: string;
+      statementBalanceMinor: bigint;
+      reconciledBalanceMinor: bigint;
     }) => {
       const { error } = await supabase.from("reconciliations").insert({
         user_id: session!.user.id,
@@ -1066,7 +1439,10 @@ export function useCompleteReconciliation() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reconciliations"] }); toast.success("Statement matched"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reconciliations"] });
+      toast.success("Statement matched");
+    },
   });
 }
 
@@ -1089,7 +1465,10 @@ export function useBudgets() {
     queryKey: ["budgets", userId],
     enabled: !!userId,
     queryFn: async (): Promise<BudgetRow[]> => {
-      const { data, error } = await supabase.rpc("fn_budget_status", { p_user: userId!, p_month: todayIso() });
+      const { data, error } = await supabase.rpc("fn_budget_status", {
+        p_user: userId!,
+        p_month: todayIso(),
+      });
       if (error) throw error;
       return data as BudgetRow[];
     },
@@ -1101,9 +1480,16 @@ export function useSetBudget() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: { categoryId: string; amountMinor: bigint | null; currency: string }) => {
+    mutationFn: async (input: {
+      categoryId: string;
+      amountMinor: bigint | null;
+      currency: string;
+    }) => {
       if (input.amountMinor == null) {
-        const { error } = await supabase.from("budgets").delete().eq("category_id", input.categoryId);
+        const { error } = await supabase
+          .from("budgets")
+          .delete()
+          .eq("category_id", input.categoryId);
         if (error) throw error;
         return;
       }
@@ -1119,15 +1505,18 @@ export function useSetBudget() {
       );
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budgets"] }); toast.success("Budget saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget saved");
+    },
   });
 }
 
 // ── CSV / bank-statement import (§16) ────────────────────────────────────────
 export interface ImportRow {
-  date: string;            // ISO
+  date: string; // ISO
   description: string;
-  amountMinor: bigint;     // absolute value
+  amountMinor: bigint; // absolute value
   direction: "in" | "out";
   categoryId: string;
 }
@@ -1137,22 +1526,46 @@ export interface ImportRow {
 export function useImportEntries() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { accountId: string; currency: string; base: string; rows: ImportRow[] }) => {
-      let imported = 0, skipped = 0;
+    mutationFn: async (input: {
+      accountId: string;
+      currency: string;
+      base: string;
+      rows: ImportRow[];
+    }) => {
+      let imported = 0,
+        skipped = 0;
       for (const r of input.rows) {
-        const legs = r.direction === "out"
-          ? buildExpenseLegs({ categoryAccountId: r.categoryId, cashAccountId: input.accountId, currency: input.currency, amountMinor: r.amountMinor, fxRate: 1, baseCurrency: input.base })
-          : buildIncomeLegs({ categoryAccountId: r.categoryId, cashAccountId: input.accountId, currency: input.currency, amountMinor: r.amountMinor, fxRate: 1, baseCurrency: input.base });
+        const legs =
+          r.direction === "out"
+            ? buildExpenseLegs({
+                categoryAccountId: r.categoryId,
+                cashAccountId: input.accountId,
+                currency: input.currency,
+                amountMinor: r.amountMinor,
+                fxRate: 1,
+                baseCurrency: input.base,
+              })
+            : buildIncomeLegs({
+                categoryAccountId: r.categoryId,
+                cashAccountId: input.accountId,
+                currency: input.currency,
+                amountMinor: r.amountMinor,
+                fxRate: 1,
+                baseCurrency: input.base,
+              });
         const ref = `import:${input.accountId}:${r.date}:${r.direction === "out" ? "-" : ""}${r.amountMinor}:${r.description.trim().toLowerCase().slice(0, 60)}`;
         const { data, error } = await supabase.rpc("import_entry", {
           p_kind: r.direction === "out" ? "expense" : "income",
           p_entry_date: r.date,
-          p_description: r.description.trim() || (r.direction === "out" ? "Imported payment" : "Imported deposit"),
+          p_description:
+            r.description.trim() ||
+            (r.direction === "out" ? "Imported payment" : "Imported deposit"),
           p_lines: toRpcLines(legs),
           p_external_ref: ref,
         });
         if (error) throw error;
-        if (data) imported++; else skipped++;
+        if (data) imported++;
+        else skipped++;
       }
       return { imported, skipped };
     },
@@ -1160,7 +1573,9 @@ export function useImportEntries() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["reconcile-lines"] });
-      toast.success(`Imported ${imported}${skipped ? `, skipped ${skipped} already there` : ""}`);
+      toast.success(
+        `Imported ${imported}${skipped ? `, skipped ${skipped} already there` : ""}`,
+      );
     },
   });
 }
