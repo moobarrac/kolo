@@ -5,6 +5,7 @@ import {
   buildExpenseLegs,
   type Frequency,
 } from "@kolo/shared";
+import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { ComingSoon } from "@/components/ComingSoon";
 import { DateField } from "@/components/DateField";
@@ -116,7 +117,26 @@ export function RecurringPage() {
           <div className="space-y-3">
             <Input label="Name" placeholder="e.g. Rent" value={name} onChange={setName} />
             <Select label={kind === "expense" ? "Paid from" : "Goes to"} value={moneyAccountId} onChange={setMoneyAccountId} options={assets} placeholder="Choose an account" />
-            <Select label={kind === "expense" ? "Category" : "Source"} value={categoryId} onChange={setCategoryId} options={categories} placeholder="Choose one" />
+            {categories.length === 0 ? (
+              <div>
+                <label className="mb-1 block text-xs text-ink/55">
+                  {kind === "expense" ? "What was it for?" : "What kind of income?"}
+                </label>
+                <p className="rounded-lg border border-dashed border-ink/20 px-3 py-2.5 text-xs text-ink/55">
+                  No {kind === "expense" ? "spending categories" : "income sources"} in {currency} yet.{" "}
+                  <Link to="/settings" className="text-brass hover:underline">Add one in Settings</Link>
+                  {kind === "income" ? ' (e.g. "Salary").' : "."}
+                </p>
+              </div>
+            ) : (
+              <Select
+                label={kind === "expense" ? "What was it for?" : "What kind of income?"}
+                value={categoryId}
+                onChange={setCategoryId}
+                options={categories}
+                placeholder="Choose one"
+              />
+            )}
             <div>
               <label className="mb-1 block text-xs text-ink/55">Amount ({currency})</label>
               <input className={field} inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
