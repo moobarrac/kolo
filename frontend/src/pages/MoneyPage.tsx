@@ -9,9 +9,21 @@ import { Money } from "@/components/Money";
 import { CashFlowSummary } from "@/components/CashFlowSummary";
 import { ListSkeleton } from "@/components/Skeleton";
 import { ArrowRightLeft } from "lucide-react";
-import { useTransactions, useUserAccounts, useCashFlow, type TransactionRow } from "@/lib/data";
+import {
+  useTransactions,
+  useUserAccounts,
+  useCashFlow,
+  useReverseEntry,
+  type TransactionRow,
+} from "@/lib/data";
+import { useConfirm } from "@/components/Confirm";
 import { MonthPicker } from "@/components/MonthPicker";
-import { currentMonth, currentMonthValue, monthRange, formatDate } from "@/lib/dates";
+import {
+  currentMonth,
+  currentMonthValue,
+  monthRange,
+  formatDate,
+} from "@/lib/dates";
 
 // Transaction-list filters. "Transfers" groups the money-moving entry kinds.
 type FilterKey = "all" | "in" | "out" | "transfers";
@@ -19,7 +31,11 @@ const FILTERS: { key: FilterKey; label: string; kinds?: string[] }[] = [
   { key: "all", label: "All" },
   { key: "in", label: "Money in", kinds: ["income"] },
   { key: "out", label: "Money out", kinds: ["expense"] },
-  { key: "transfers", label: "Transfers", kinds: ["transfer", "fx_conversion", "loan_payment", "loan_drawdown"] },
+  {
+    key: "transfers",
+    label: "Transfers",
+    kinds: ["transfer", "fx_conversion", "loan_payment", "loan_drawdown"],
+  },
 ];
 type RangeKey = "month" | "3mo" | "all" | "pick";
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -49,12 +65,23 @@ export function MoneyPage() {
   const [search, setSearch] = useState("");
 
   const kinds = FILTERS.find((f) => f.key === filter)?.kinds;
-  const dateWindow = range === "pick" ? monthRange(pickMonth) : { from: rangeFrom(range), to: undefined as string | undefined };
-  const txns = useTransactions({ kinds, from: dateWindow.from, to: dateWindow.to, search });
+  const dateWindow =
+    range === "pick"
+      ? monthRange(pickMonth)
+      : { from: rangeFrom(range), to: undefined as string | undefined };
+  const txns = useTransactions({
+    kinds,
+    from: dateWindow.from,
+    to: dateWindow.to,
+    search,
+  });
 
   return (
     <>
-      <PageHeader title="Money in & out" subtitle="What you earn and what you spend." />
+      <PageHeader
+        title="Money in & out"
+        subtitle="What you earn and what you spend."
+      />
 
       {!accounts.isLoading && !hasAccounts ? (
         <ComingSoon
@@ -69,10 +96,16 @@ export function MoneyPage() {
           </div>
           <div className="space-y-8">
             {cashFlow.data && (
-              <CashFlowSummary flow={cashFlow.data.flow} base={cashFlow.data.base} label={month.label} />
+              <CashFlowSummary
+                flow={cashFlow.data.flow}
+                base={cashFlow.data.base}
+                label={month.label}
+              />
             )}
             <section>
-              <p className="mb-3 text-sm uppercase tracking-wide text-ink/50">History</p>
+              <p className="mb-3 text-sm uppercase tracking-wide text-ink/50">
+                History
+              </p>
 
               {/* Filters */}
               <div className="mb-3 space-y-2">
@@ -82,7 +115,9 @@ export function MoneyPage() {
                       key={f.key}
                       onClick={() => setFilter(f.key)}
                       className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        filter === f.key ? "bg-surface text-forest shadow-sm" : "text-ink/55 hover:text-ink/80"
+                        filter === f.key
+                          ? "bg-surface text-forest shadow-sm"
+                          : "text-ink/55 hover:text-ink/80"
                       }`}
                     >
                       {f.label}
@@ -95,9 +130,15 @@ export function MoneyPage() {
                     onChange={(e) => setRange(e.target.value as RangeKey)}
                     className="rounded-lg border border-ink/15 bg-surface px-3 py-2 text-xs outline-none focus:border-forest"
                   >
-                    {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    {RANGES.map((r) => (
+                      <option key={r.key} value={r.key}>
+                        {r.label}
+                      </option>
+                    ))}
                   </Select>
-                  {range === "pick" && <MonthPicker value={pickMonth} onChange={setPickMonth} />}
+                  {range === "pick" && (
+                    <MonthPicker value={pickMonth} onChange={setPickMonth} />
+                  )}
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -108,8 +149,14 @@ export function MoneyPage() {
               </div>
 
               {txns.isLoading && <ListSkeleton rows={5} />}
-              {txns.isError && <p className="text-loss">We couldn't load your history. Please refresh.</p>}
-              {txns.data?.length === 0 && <p className="text-ink/50">Nothing matches these filters.</p>}
+              {txns.isError && (
+                <p className="text-loss">
+                  We couldn't load your history. Please refresh.
+                </p>
+              )}
+              {txns.data?.length === 0 && (
+                <p className="text-ink/50">Nothing matches these filters.</p>
+              )}
               <ul className="space-y-2">
                 {txns.data?.map((t) => (
                   <TxnRow key={t.id} txn={t} />
@@ -126,18 +173,54 @@ export function MoneyPage() {
 function TxnRow({ txn }: { txn: TransactionRow }) {
   // Show the entry from the debit (positive) line that isn't the money account —
   // good enough for a glanceable list: the amount + a name + the date.
-  const primary = txn.journal_lines.find((l) => l.amount_minor > 0) ?? txn.journal_lines[0];
+  const primary =
+    txn.journal_lines.find((l) => l.amount_minor > 0) ?? txn.journal_lines[0];
   const name = txn.description || primary?.accounts?.name || txn.kind;
-  const amount = primary ? money(BigInt(Math.abs(primary.amount_minor)), primary.currency) : null;
-  const tone = txn.kind === "income" ? "gain" : txn.kind === "expense" ? "loss" : "balance";
+  const amount = primary
+    ? money(BigInt(Math.abs(primary.amount_minor)), primary.currency)
+    : null;
+  const tone =
+    txn.kind === "income"
+      ? "gain"
+      : txn.kind === "expense"
+        ? "loss"
+        : "balance";
+  const reverse = useReverseEntry();
+  const confirm = useConfirm();
+
+  async function undo() {
+    const ok = await confirm({
+      title: "Undo this?",
+      body: `This reverses "${name}" and restores the balances it changed.`,
+      confirmLabel: "Undo",
+      danger: true,
+    });
+    if (ok) reverse.mutate(txn.id);
+  }
 
   return (
-    <li className="flex items-center justify-between rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-ink/5">
-      <div>
-        <p className="font-medium">{name}</p>
+    <li className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3 text-sm ring-1 ring-ink/5">
+      <div className="min-w-0">
+        <p className="truncate font-medium">{name}</p>
         <p className="text-xs text-ink/50">{formatDate(txn.entry_date)}</p>
       </div>
-      {amount && <span title={formatMoney(amount)}><Money value={amount} tone={tone} /></span>}
+      <div className="flex shrink-0 items-center gap-3">
+        {amount && (
+          <span title={formatMoney(amount)}>
+            <Money value={amount} tone={tone} />
+          </span>
+        )}
+        {txn.kind !== "reversal" && (
+          <button
+            onClick={undo}
+            disabled={reverse.isPending}
+            className="text-xs text-ink/40 hover:text-loss disabled:opacity-50"
+            title="Undo this entry"
+          >
+            Undo
+          </button>
+        )}
+      </div>
     </li>
   );
 }

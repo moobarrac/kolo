@@ -14,6 +14,7 @@ import {
   useAssets,
   useCreateAsset,
   useRevalueAsset,
+  useRemoveAsset,
   useUserAccounts,
   useProfile,
   type AssetRow,
@@ -225,8 +226,23 @@ export function ThingsIOwnPage() {
 
 function AssetItem({ asset, base }: { asset: AssetRow; base: string }) {
   const revalue = useRevalueAsset();
+  const removeAsset = useRemoveAsset();
   const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
+
+  async function remove() {
+    const ok = await confirm({
+      title: `Remove ${asset.name}?`,
+      body: "This undoes how it was added and takes it off your net worth. Its history is kept.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    await removeAsset.mutateAsync({
+      assetId: asset.id,
+      accountId: asset.account_id,
+    });
+  }
   const [value, setValue] = useState("");
   const cur = asset.currency ?? base;
   const gain = asset.current_value_minor - (asset.purchase_price_minor ?? 0);
@@ -295,12 +311,21 @@ function AssetItem({ asset, base }: { asset: AssetRow; base: string }) {
           </button>
         </div>
       ) : (
-        <button
-          onClick={() => setEditing(true)}
-          className="mt-2 text-xs text-brass hover:underline"
-        >
-          Update its value
-        </button>
+        <div className="mt-2 flex items-center gap-4">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs text-brass hover:underline"
+          >
+            Update its value
+          </button>
+          <button
+            onClick={remove}
+            disabled={removeAsset.isPending}
+            className="text-xs text-loss hover:underline disabled:opacity-50"
+          >
+            Remove
+          </button>
+        </div>
       )}
     </li>
   );

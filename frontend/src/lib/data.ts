@@ -163,6 +163,128 @@ export function useAddCommonCategories() {
   });
 }
 
+// Undo a posted entry by posting its reversal (§5.2 — never edit/delete). Fixes
+// mistakes for any kind of entry: income, expense, transfer, asset add, etc.
+export function useReverseEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (entryId: string) => {
+      const { error } = await supabase.rpc("reverse_entry", {
+        p_entry: entryId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      for (const k of [
+        "overview",
+        "transactions",
+        "accounts",
+        "cashflow",
+        "assets",
+      ])
+        qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Undone");
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Couldn't undo that"),
+  });
+}
+
+// Remove an asset: reverse every posted entry that touched its account (its
+// purchase/opening and any revaluations), archive the account, and drop the
+// registry row. The ledger keeps the reversing entries for audit.
+export function useRemoveAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { assetId: string; accountId: string }) => {
+      const { data: touch, error: tErr } = await supabase
+        .from("journal_lines")
+        .select("entry_id")
+        .eq("account_id", input.accountId);
+      if (tErr) throw tErr;
+      const ids = [...new Set((touch ?? []).map((r) => r.entry_id as string))];
+      if (ids.length) {
+        const { data: entries, error: eErr } = await supabase
+          .from("journal_entries")
+          .select("id, kind, status")
+          .in("id", ids);
+        if (eErr) throw eErr;
+        for (const e of entries ?? []) {
+          if (e.status !== "posted" || e.kind === "reversal") continue;
+          const { error } = await supabase.rpc("reverse_entry", {
+            p_entry: e.id,
+          });
+          if (error && !/already been reversed/.test(error.message))
+            throw error;
+        }
+      }
+      await supabase
+        .from("accounts")
+        .update({ is_archived: true })
+        .eq("id", input.accountId);
+      const { error: dErr } = await supabase
+        .from("assets")
+        .delete()
+        .eq("id", input.assetId);
+      if (dErr) throw dErr;
+    },
+    onSuccess: () => {
+      for (const k of ["assets", "overview", "accounts", "transactions"])
+        qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Removed");
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Couldn't remove it"),
+  });
+}
+
+// Remove an account. Real-money accounts (asset/liability) must be at zero first
+// (reverse their transactions). Delete it outright if it was never used, else
+// archive it so its history stays intact.
+export function useRemoveAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { accountId: string; type: AccountType }) => {
+      if (input.type === "asset" || input.type === "liability") {
+        const { data: bal, error: bErr } = await supabase.rpc(
+          "fn_account_balance",
+          { p_account: input.accountId, p_as_of: todayIso() },
+        );
+        if (bErr) throw bErr;
+        if (BigInt(bal ?? 0) !== 0n)
+          throw new Error(
+            "This account still has a balance — undo its transactions first.",
+          );
+      }
+      const { count, error: cErr } = await supabase
+        .from("journal_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("account_id", input.accountId);
+      if (cErr) throw cErr;
+      if ((count ?? 0) === 0) {
+        const { error } = await supabase
+          .from("accounts")
+          .delete()
+          .eq("id", input.accountId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("accounts")
+          .update({ is_archived: true })
+          .eq("id", input.accountId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      for (const k of ["accounts", "overview", "transactions"])
+        qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Removed");
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Couldn't remove it"),
+  });
+}
+
 export function usePostEntry() {
   const qc = useQueryClient();
   return useMutation({
